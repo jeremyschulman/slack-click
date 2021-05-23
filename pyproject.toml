@@ -7,8 +7,9 @@ authors = ["Jeremy Schulman <jeremy.schulman@mlb.com>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 slack-bolt = "^1.6.0"
-click = "^8.0.1"
+click = "<8"
 pyee = "^8.1.0"
+first = "^2.0.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

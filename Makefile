@@ -1,6 +1,6 @@
 .PHONY: setup.py requirements.txt
 
-DIST_BASENAME := $(shell poetry version | tr ' ' '-')
+DIST_BASENAME := $(shell poetry version | tr '-' '_' | tr ' ' '-')
 
 build: setup.py requirements.txt
 

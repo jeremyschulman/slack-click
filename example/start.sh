@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-uvicorn demo_app:api \
+uvicorn clicker:api \
   --host 0.0.0.0 \
   --port ${SLACK_APP_PORT} \
   --reload

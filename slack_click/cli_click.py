@@ -29,6 +29,15 @@ import click
 from click import decorators
 from click import Command, Option, Group
 import pyee
+from slack_bolt.request.async_request import AsyncBoltRequest as Request
+from first import first
+
+# -----------------------------------------------------------------------------
+# Exports
+# -----------------------------------------------------------------------------
+
+__all__ = ["version_option", "SlackClickGroup", "SlackClickCommand", "SlackClickHelper"]
+
 
 # -----------------------------------------------------------------------------
 #
@@ -63,8 +72,8 @@ def version_option(version: str, *param_decls, **attrs):
     """
 
     async def send_version(ctx, message):
-        rqst: CommandRequest = ctx.obj["rqst"]
-        await Response(rqst).send(text=message)
+        request: Request = ctx.obj["request"]
+        await request.context["say"](f"```{message}```")
 
     def decorator(f):
         prog_name = attrs.pop("prog_name", None)
@@ -98,7 +107,7 @@ class SlackClickHelper(Command):
         super(SlackClickHelper, self).__init__(*vargs, **kwargs)
 
     @staticmethod
-    def format_slack_usage_help(rqst: CommandRequest, ctx: click.Context, errmsg: str):
+    def format_slack_usage_help(command: dict, ctx: click.Context, errmsg: str):
         """
         This function returns a dictionary formatted with the Slack message
         that will be sent to the User upon any command usage error.  As a
@@ -107,13 +116,8 @@ class SlackClickHelper(Command):
 
         Parameters
         ----------
-        rqst: CommandRequest
-            The origin Slack command request that provides information about the command
-            requested.  The rqst.rqst_data['command'] contains the slash-command used
-            and the rqst.rqst_data['text'] contains the command parameters as entered by the
-            User.  The rqst.user_id contains the Slack UserId that originated the request.
-            For more inforamtion about the CommandRequest class attributes, refer to that
-            class definition.
+        command: dict
+            The command data from the Slack request
 
         ctx: click.Context
             The Click context processing the User command.
@@ -131,8 +135,8 @@ class SlackClickHelper(Command):
         msg_body = dict()
         atts = msg_body["attachments"] = list()
 
-        try_cmd = f"{rqst.rqst_data['command']} {rqst.rqst_data['text']}"
-        user_id = rqst.user_id
+        try_cmd = f"{command['command']} {command['text']}"
+        user_id = command["user_id"]
 
         atts.append(
             dict(
@@ -163,8 +167,8 @@ class SlackClickHelper(Command):
         def slack_show_help(_ctx: click.Context, param, value):  # noqa
             if value and not _ctx.resilient_parsing:
                 payload = self.format_slack_help(_ctx)
-                resp = Response(_ctx.obj["rqst"])
-                asyncio.create_task(resp.send(**payload))
+                request: Request = _ctx.obj["request"]
+                asyncio.create_task(request.context["say"](**payload))
                 _ctx.exit()
 
         return Option(
@@ -184,9 +188,9 @@ class SlackClickHelper(Command):
         click_context.set(ctx)
         return super().invoke(ctx)
 
-    async def run(self, rqst, **_extras):
-        args = rqst.rqst_data["text"].split()
-        ctx_obj = dict(rqst=rqst, args=args)
+    async def run(self, request: Request, command: dict):
+        args = command.get("text", "").split()
+        ctx_obj = dict(request=request, command=command)
 
         try:
             # Call the Click main method for this Command/Group instance.  The
@@ -208,10 +212,9 @@ class SlackClickHelper(Command):
                 or self.make_context(self.name, args, obj=ctx_obj)
             )
             payload = self.format_slack_usage_help(
-                rqst, ctx, errmsg=exc.format_message()
+                command, ctx, errmsg=exc.format_message()
             )
-            resp = Response(rqst)
-            await resp.send(**payload)
+            await request.context["say"](**payload)
             return
 
         except click.exceptions.Exit:
@@ -269,14 +272,15 @@ class SlackClickGroup(SlackClickHelper, Group):
 
         return wrapper
 
-    async def emit(self, rqst, event):
+    async def emit(self, request: Request, event: str):
         handler = first(self.ic.listeners(event))
 
         if handler is None:
-            rqst.app.log.critical(f"No handler for command option '{event}'")
+            log = request.context.logger
+            log.critical(f"No handler for command option '{event}'")
             return
 
-        return await handler(rqst)
+        return await handler(request)
 
 
 # -----------------------------------------------------------------------------
