@@ -1,20 +1,24 @@
-import click
+# -----------------------------------------------------------------------------
+# Public Imports
+# -----------------------------------------------------------------------------
 
+import click
 from slack_bolt.request.async_request import AsyncBoltRequest as Request
 from slack_click import SlackClickGroup, version_option
 
+# -----------------------------------------------------------------------------
+# Private Imports
+# -----------------------------------------------------------------------------
+
 from .app_data import slack_commands
 
-
-# @slack_app.event("app_mention")
-# async def handle_mentions(event, client, say):  # async function
-#     api_response = await client.reactions_add(
-#         channel=event["channel"],
-#         timestamp=event["ts"],
-#         name="eyes",
-#     )
+# -----------------------------------------------------------------------------
 #
-#     await say("What's up?")
+#                                 CODE BEGINS
+#
+# -----------------------------------------------------------------------------
+
+# Register the "/click" command with the Slack app for async-handling
 
 
 @slack_commands.register()
