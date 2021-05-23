@@ -8,6 +8,5 @@ from . import command_click  # noqa
 
 ENV_VARS = ["SLACK_SIGNING_SECRET", "SLACK_BOT_TOKEN", "SLACK_APP_PORT"]
 
-if __name__ == "__main__":
-    if not all(environ.get(envar) for envar in ENV_VARS):
-        sys.exit(f"Missing required environment variables: {ENV_VARS}")
+if missing := [envar for envar in ENV_VARS if not environ.get(envar)]:
+    sys.exit(f"Missing required environment variables: {missing}")

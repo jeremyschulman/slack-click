@@ -25,7 +25,9 @@ async def cli_click_group(obj: dict):
     """
     This is the Clicker /click command group
     """
-    pass
+    request: Request = obj["request"]
+    say = request.context["say"]
+    await say("`/click` command invoked without any commands or options.")
 
 
 @cli_click_group.command("ping")
@@ -33,4 +35,4 @@ async def cli_click_group(obj: dict):
 async def click_ping(obj):
     """Click ping"""
     request: Request = obj["request"]
-    await request.context.say(":eyes: Click called")
+    await request.context.say(":eyes: click-pong")
