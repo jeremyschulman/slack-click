@@ -92,7 +92,7 @@ async def click_hello_command(obj):
 If you want to change the Slack message format for help or usage methods you can
 subclass `SlackCLickCommand` or `SlackClickGroup` and overload the methods:
 
-* *format_slack_help* - returns the Slack message payload (dict) for `--help` 
+* *format_slack_help* - returns the Slack message payload (dict) for `--help`
 * *format_slack_usage_help* - returns the Slack message payload (dict) when click exception `UsageError` is raised.
 
 For implementation details, please refer to the `SlackClickHelper` class, the parent

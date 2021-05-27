@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "slack_click"
-version = "0.1.0"
+version = "1.0.0"
 description = "Click support for Slack-Bolt applications"
 authors = ["Jeremy Schulman"]
 
