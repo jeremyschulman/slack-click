@@ -3,8 +3,8 @@
 # -----------------------------------------------------------------------------
 
 import click
+from slack_click import SlackClickCommand, version_option
 from slack_bolt.request.async_request import AsyncBoltRequest as Request
-from slack_click import SlackClickGroup, version_option
 
 # -----------------------------------------------------------------------------
 # Private Imports
@@ -22,20 +22,10 @@ from .app_data import slack_commands
 
 
 @slack_commands.register()
-@click.group(name="/click", cls=SlackClickGroup)
+@click.group(name="/ping", cls=SlackClickCommand)
 @version_option(version="0.1.0")
 @click.pass_obj
-async def cli_click_group(obj: dict):
-    """
-    This is the Clicker /click command group
-    """
+async def cli_ping_command(obj: dict):
     request: Request = obj["request"]
     say = request.context["say"]
-    await say("`/click` command invoked without any commands or options.")
-
-
-@cli_click_group.command("hello")
-@click.pass_obj
-async def click_hello_command(obj):
-    request: Request = obj["request"]
-    await request.context.say(f"Hi there <@{request.context.user_id}> :eyes:")
+    await say(f"Hiya <@{request.context.user_id}>.  Ping back at you :eyes:")
