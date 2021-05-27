@@ -37,7 +37,7 @@ slack_socket_handler = AsyncSocketModeHandler(slack_app)
 slack_commands = SlackAppCommands(app=slack_app)
 ```
 
-The `slack_commands` instance provides a `.register()` method decorator that is
+A `SlackAppCommands` instance provides a `.register()` method decorator that is
 used to hook in the Slack bolt command handler process.  See examples below.
 
 ---
@@ -88,6 +88,15 @@ async def click_hello_command(obj):
 ```
 
 # Customizing Help
+
+If you want to change the Slack message format for help or usage methods you can
+subclass `SlackCLickCommand` or `SlackClickGroup` and overload the methods:
+
+* *format_slack_help* - returns the Slack message payload (dict) for `--help` 
+* *format_slack_usage_help* - returns the Slack message payload (dict) when click exception `UsageError` is raised.
+
+For implementation details, please refer to the `SlackClickHelper` class, the parent
+class for the `SlackClickCommand` and `SlackClickGroup` classes.
 
 # References
 * [Click Package Home](https://click.palletsprojects.com/)
