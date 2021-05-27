@@ -1,2 +1,5 @@
-aiohttp
+fastapi
 uvicorn
+aiohttp
+slack_bolt
+slack-click

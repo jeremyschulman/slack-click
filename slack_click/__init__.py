@@ -5,3 +5,4 @@ from .cli_click import (
     SlackClickCommand,
     version_option,
 )
+from .app_click import SlackAppCommands

@@ -22,7 +22,7 @@ from .app_data import slack_commands
 
 
 @slack_commands.register()
-@click.group(name="/ping", cls=SlackClickCommand)
+@click.command(name="/ping", cls=SlackClickCommand)
 @version_option(version="0.1.0")
 @click.pass_obj
 async def cli_ping_command(obj: dict):
