@@ -1,7 +1,10 @@
 [tool.poetry]
 name = "slack_click"
-version = "1.0.0"
+version = "1.0.1"
 description = "Click support for Slack-Bolt applications"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/jeremyschulman/slack-click"
 authors = ["Jeremy Schulman"]
 
 [tool.poetry.dependencies]
