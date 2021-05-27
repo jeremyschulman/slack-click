@@ -1,0 +1,5 @@
+click==7.1.2; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0")
+first==2.0.2
+pyee==8.1.0
+slack-bolt==1.6.0; python_version >= "3.6"
+slack-sdk==3.5.1; python_full_version >= "3.6.0" and python_version >= "3.6"
