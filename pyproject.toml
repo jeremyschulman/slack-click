@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "slack_click"
-version = "1.0.1"
+version = "1.1.0"
 description = "Click support for Slack-Bolt applications"
 license = "Apache-2.0"
 readme = "README.md"
