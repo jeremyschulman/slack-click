@@ -17,8 +17,7 @@ from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 
 from .app_data import api, app
 from . import command_click  # noqa
-
-# from . import command_ping
+from . import command_ping  # noqa
 
 # -----------------------------------------------------------------------------
 #

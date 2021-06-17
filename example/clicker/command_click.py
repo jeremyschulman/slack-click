@@ -20,7 +20,15 @@ from .app_data import app
 # -----------------------------------------------------------------------------
 
 
-# Register the "/click" command with the Slack app for async-handling
+# -----------------------------------------------------------------------------
+# Define a Click group handler for the Slack Slash-Command
+#
+# Notes:
+#   @click_async decorator must be used for asyncio mode
+#   @click.pass_obj inserts the click.Context obj into the callback parameters
+#       By default the obj is the Slack-Bolt request instance; see the
+#       @app.command code further down.
+# -----------------------------------------------------------------------------
 
 
 @click.group(name="/clicker", cls=AsyncSlackClickGroup)
@@ -35,12 +43,23 @@ async def cli_click_group(request: Request):
     await say("`/click` command invoked without any commands or options.")
 
 
+# -----------------------------------------------------------------------------
+# Register the command with Slack-Bolt
+# -----------------------------------------------------------------------------
+
+
 @app.command(cli_click_group.name)
 async def on_clicker(request: Request, ack, say):
     await ack()
     await say("Got it.")
 
     return await cli_click_group(prog_name=cli_click_group.name, obj=request)
+
+
+# -----------------------------------------------------------------------------
+# Define Click group commands; at this point everything is the same as writing
+# any Click command decorator stack.
+# -----------------------------------------------------------------------------
 
 
 @cli_click_group.command("hello")
