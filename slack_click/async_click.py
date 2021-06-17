@@ -16,7 +16,7 @@
 # System Imports
 # -----------------------------------------------------------------------------
 
-from typing import Coroutine
+from typing import Coroutine, Callable, Any
 import asyncio
 from functools import wraps
 from contextvars import ContextVar
@@ -36,7 +36,12 @@ from first import first
 # Exports
 # -----------------------------------------------------------------------------
 
-__all__ = ["version_option", "SlackClickGroup", "SlackClickCommand", "SlackClickHelper"]
+__all__ = [
+    "version_option",
+    "click_async",
+    "AsyncSlackClickGroup",
+    "AsyncSlackClickCommand",
+]
 
 
 # -----------------------------------------------------------------------------
@@ -44,6 +49,23 @@ __all__ = ["version_option", "SlackClickGroup", "SlackClickCommand", "SlackClick
 #                                 CODE BEGINS
 #
 # -----------------------------------------------------------------------------
+
+
+def click_async(callback=None):
+    def wrapped(func):
+        @wraps(func)
+        def new_callback(*vargs, **kwargs):
+            ctx = g_click_context.get()
+            if ctx.invoked_subcommand:
+                return
+
+            # presume the orig_callback was defined as an async def.  Therefore
+            # defer the execution of the coroutine to the calling main.
+            return func(*vargs, **kwargs)
+
+        return new_callback
+
+    return wrapped if not callback else wrapped(callback)
 
 
 def version_option(version: str, *param_decls, **attrs):
@@ -71,17 +93,19 @@ def version_option(version: str, *param_decls, **attrs):
 
     """
 
-    async def send_version(ctx, message):
-        request: Request = ctx.obj["request"]
+    async def send_version(ctx: click.Context, message: str):
+        slack_cmd: SlackClickHelper = ctx.command
+        request = slack_cmd.obj_slack_request(ctx.obj)
         await request.context["say"](f"```{message}```")
 
-    def decorator(f):
+    def decorator(func):
         prog_name = attrs.pop("prog_name", None)
         message = attrs.pop("message", "%(prog)s, version %(version)s")
 
         def callback(ctx, param, value):  # noqa
             if not value or ctx.resilient_parsing:
                 return
+
             prog = prog_name
             if prog is None:
                 prog = ctx.find_root().info_name
@@ -89,6 +113,7 @@ def version_option(version: str, *param_decls, **attrs):
             asyncio.create_task(
                 send_version(ctx, (message % {"prog": prog, "version": version}))
             )
+
             ctx.exit()
 
         attrs.setdefault("is_flag", True)
@@ -96,7 +121,7 @@ def version_option(version: str, *param_decls, **attrs):
         attrs.setdefault("is_eager", True)
         attrs.setdefault("help", "Show the version and exit.")
         attrs["callback"] = callback
-        return decorators.option(*(param_decls or ("--version",)), **attrs)(f)
+        return decorators.option(*(param_decls or ("--version",)), **attrs)(func)
 
     return decorator
 
@@ -104,10 +129,17 @@ def version_option(version: str, *param_decls, **attrs):
 class SlackClickHelper(Command):
     def __init__(self, *vargs, **kwargs):
         self.event_id = kwargs.get("name")
+        self.obj_slack_request: Callable[[Any], Request] = kwargs.pop(
+            "slack_request", self._slack_request_is_obj
+        )
         super(SlackClickHelper, self).__init__(*vargs, **kwargs)
 
     @staticmethod
-    def format_slack_usage_help(command: dict, ctx: click.Context, errmsg: str):
+    def _slack_request_is_obj(obj):
+        return obj
+
+    @staticmethod
+    def slack_format_usage_help(command: dict, ctx: click.Context, errmsg: str):
         """
         This function returns a dictionary formatted with the Slack message
         that will be sent to the User upon any command usage error.  As a
@@ -155,7 +187,7 @@ class SlackClickHelper(Command):
         return msg_body
 
     @staticmethod
-    def format_slack_help(ctx: click.Context):
+    def slack_format_help(ctx: click.Context):
         help_text = ctx.get_help()
         return dict(text=f"*Command help:*\n```{help_text}```", fallback=help_text)
 
@@ -166,8 +198,9 @@ class SlackClickHelper(Command):
 
         def slack_show_help(_ctx: click.Context, param, value):  # noqa
             if value and not _ctx.resilient_parsing:
-                payload = self.format_slack_help(_ctx)
-                request: Request = _ctx.obj["request"]
+                payload = self.slack_format_help(_ctx)
+                slack_cmd: SlackClickHelper = _ctx.command
+                request = slack_cmd.obj_slack_request(ctx.obj)
                 asyncio.create_task(request.context["say"](**payload))
                 _ctx.exit()
 
@@ -185,12 +218,36 @@ class SlackClickHelper(Command):
         return the coroutine ready for await, but cannot await here ...
         execution deferred to the `run` method that is async.
         """
-        click_context.set(ctx)
+        g_click_context.set(ctx)
         return super().invoke(ctx)
 
-    async def run(self, request: Request, command: dict):
-        args = command.get("text", "").split()
-        ctx_obj = dict(request=request, command=command)
+    async def __call__(self, *vargs, **kwargs):
+        await self.main(*vargs, **kwargs)
+
+    async def main(
+        self,
+        args=None,
+        prog_name=None,
+        complete_var=None,
+        standalone_mode=False,
+        **extra,
+    ):
+
+        if (obj := extra.get("obj")) is None:
+            raise ValueError("Missing obj to contain Slack-Bolt request, required.")
+
+        request = self.obj_slack_request(obj)
+
+        if not isinstance(request, Request):
+            raise ValueError(
+                "obj missing expected Slack-Bolt request instance, required."
+            )
+
+        # if args are not explicitly provided, then examine the slack command
+        # request 'text' field in the payload body.
+
+        if not args:
+            args = request.body.get("text", "").split()
 
         try:
             # Call the Click main method for this Command/Group instance.  The
@@ -198,8 +255,8 @@ class SlackClickHelper(Command):
             # async handling, or there is an Exception that needs to be
             # handled.
 
-            cli_coro = self.main(
-                args=args, prog_name=self.name, obj=ctx_obj, standalone_mode=False
+            cli_coro = super(SlackClickHelper, self).main(
+                args, prog_name, complete_var, standalone_mode, **extra
             )
 
             if isinstance(cli_coro, Coroutine):
@@ -208,12 +265,14 @@ class SlackClickHelper(Command):
         except click.exceptions.UsageError as exc:
             ctx = (
                 exc.ctx
-                or click_context.get()
-                or self.make_context(self.name, args, obj=ctx_obj)
+                or g_click_context.get()
+                or self.make_context(self.name, args, obj=obj)
             )
-            payload = self.format_slack_usage_help(
-                command, ctx, errmsg=exc.format_message()
+
+            payload = self.slack_format_usage_help(
+                request.body, ctx, errmsg=exc.format_message()
             )
+
             await request.context["say"](**payload)
             return
 
@@ -221,21 +280,21 @@ class SlackClickHelper(Command):
             return
 
 
-class SlackClickCommand(SlackClickHelper, Command):
+class AsyncSlackClickCommand(SlackClickHelper, Command):
     pass
 
 
-class SlackClickGroup(SlackClickHelper, Group):
+class AsyncSlackClickGroup(SlackClickHelper, Group):
     def __init__(self, *vargs, **kwargs):
         self.ic = pyee.EventEmitter()
-        kwargs["invoke_without_command"] = True
-        super(SlackClickGroup, self).__init__(*vargs, **kwargs)
+        kwargs.setdefault("invoke_without_command", True)
+        super(AsyncSlackClickGroup, self).__init__(*vargs, **kwargs)
 
     @staticmethod
-    def as_async_group(f):
-        orig_callback = f.callback
+    def as_async_group(func):
+        orig_callback = func.callback
 
-        @wraps(f)
+        @wraps(func)
         def new_callback(*vargs, **kwargs):
             ctx = _contextvar_get_current_context()
             if ctx.invoked_subcommand:
@@ -245,30 +304,35 @@ class SlackClickGroup(SlackClickHelper, Group):
             # defer the execution of the coroutine to the calling main.
             return orig_callback(*vargs, **kwargs)
 
-        f.callback = new_callback
-        return f
+        func.callback = new_callback
+        return func
 
     def add_command(self, cmd, name=None):
         # need to wrap Groups in async handler since the underlying Click code
         # is assuming sync processing.
         cmd.event_id = f"{self.event_id}.{name or cmd.name}"
 
-        if isinstance(cmd, SlackClickGroup):
+        if isinstance(cmd, AsyncSlackClickGroup):
             cmd = self.as_async_group(cmd)
 
-        super(SlackClickGroup, self).add_command(cmd, name)
+        super(AsyncSlackClickGroup, self).add_command(cmd, name)
 
     def command(self, *args, **kwargs):
-        kwargs["cls"] = SlackClickCommand
+        kwargs.setdefault("cls", AsyncSlackClickCommand)
         return super().command(*args, **kwargs)
 
     def group(self, *args, **kwargs):
-        kwargs["cls"] = SlackClickGroup
+        kwargs.setdefault("cls", AsyncSlackClickGroup)
         return super().group(*args, **kwargs)
 
-    def on(self, cmd: SlackClickCommand):
-        def wrapper(f):
-            self.ic.on(cmd.event_id, f)
+    # -------------------------------------------------------------------------
+    # Used for interactive workflows such as button-press so that the
+    # associated click groups/command is invoked.
+    # -------------------------------------------------------------------------
+
+    def on(self, cmd: AsyncSlackClickCommand):
+        def wrapper(func):
+            self.ic.on(cmd.event_id, func)
 
         return wrapper
 
@@ -295,7 +359,7 @@ class SlackClickGroup(SlackClickHelper, Group):
 # stack (as implemented in Click).
 
 
-click_context = ContextVar("click_context")
+g_click_context = ContextVar("click_context")
 
 
 def _contextvar_get_current_context(silent=False):
@@ -314,7 +378,7 @@ def _contextvar_get_current_context(silent=False):
                    :exc:`RuntimeError`.
     """
     try:
-        return click_context.get()
+        return g_click_context.get()
     except LookupError:
         if not silent:
             raise RuntimeError("There is no active click context.")

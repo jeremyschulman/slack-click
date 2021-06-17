@@ -1,5 +1,5 @@
 fastapi
 uvicorn
 aiohttp
-slack_bolt
+slack-bolt
 slack-click
