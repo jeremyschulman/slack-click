@@ -35,13 +35,21 @@ async def on_ping(request: Request, ack):
     return await cli_ping_command(prog_name=cli_ping_command.name, obj=request)
 
 
+# -----------------------------------------------------------------------------
+# /fuzzy command to manifest an anminal
+# -----------------------------------------------------------------------------
+
+
 animals = [":smile_cat:", ":hear_no_evil:", ":unicorn_face:"]
 
 
-@click.command(name="/fuzzy", cls=AsyncSlackClickCommand)
+@click.command(
+    name="/fuzzy", cls=AsyncSlackClickCommand, slack_request=lambda obj: obj["here"]
+)
 @click_async
 @click.pass_obj
-async def cli_fuzzy_command(request: Request):
+async def cli_fuzzy_command(obj: dict):
+    request = obj["here"]
     say = request.context["say"]
     this_animal = animals[randrange(len(animals))]
 
@@ -51,4 +59,6 @@ async def cli_fuzzy_command(request: Request):
 @app.command(cli_fuzzy_command.name)
 async def on_fuzzy(request: Request, ack):
     await ack()
-    return await cli_fuzzy_command(prog_name=cli_fuzzy_command.name, obj=request)
+    return await cli_fuzzy_command(
+        prog_name=cli_fuzzy_command.name, obj={"here": request}
+    )
