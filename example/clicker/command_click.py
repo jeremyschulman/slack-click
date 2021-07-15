@@ -31,7 +31,7 @@ from .app_data import app
 # -----------------------------------------------------------------------------
 
 
-@click.group(name="/clicker", cls=AsyncSlackClickGroup)
+@click.group(name="/click", cls=AsyncSlackClickGroup)
 @version_option(version="0.1.0")
 @click.pass_obj
 @click_async

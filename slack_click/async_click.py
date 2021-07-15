@@ -213,13 +213,12 @@ class SlackClickHelper(Command):
             help="Show this message and exit.",
         )
 
-    def invoke(self, ctx):
-        """
-        return the coroutine ready for await, but cannot await here ...
-        execution deferred to the `run` method that is async.
-        """
+    def make_context(self, info_name, args, parent=None, **extra):
+        ctx = super(SlackClickHelper, self).make_context(
+            info_name=info_name, args=args, parent=parent, **extra
+        )
         g_click_context.set(ctx)
-        return super().invoke(ctx)
+        return ctx
 
     async def __call__(self, *vargs, **kwargs):
         await self.main(*vargs, **kwargs)
