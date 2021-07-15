@@ -220,14 +220,6 @@ class SlackClickHelper(Command):
         g_click_context.set(ctx)
         return ctx
 
-    # def invoke(self, ctx):
-    #     """
-    #     return the coroutine ready for await, but cannot await here ...
-    #     execution deferred to the `run` method that is async.
-    #     """
-    #     g_click_context.set(ctx)
-    #     return super().invoke(ctx)
-
     async def __call__(self, *vargs, **kwargs):
         await self.main(*vargs, **kwargs)
 
